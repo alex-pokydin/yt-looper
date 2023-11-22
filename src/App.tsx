@@ -23,6 +23,7 @@ function App() {
   const [currentFixed, setCurrentFixed] = useState<number>(start);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoInterval, setVideoInterval] = useState<any>(null);
+  const [player, setPlayer] = useState<any>(null);
 
   const [opts, setOpts] = useState({
     playerVars: {
@@ -55,12 +56,21 @@ function App() {
   );
   useEffect(() => debounce(start, end), [start, end]);
 
+  const onPlay = () => {
+    player.seekTo(start);
+    player.playVideo();
+  };
+  const onStop = () => {
+    player.pauseVideo();
+  };
+
   useEffect(() => {
     let videoCode = "";
     if (videoUrl) {
       videoCode = videoUrl.split("v=")[1].split("&")[0];
       setVideoId(videoCode);
-      setVideoId(videoCode);
+      setStart(0);
+      setEnd(100);
     }
   }, [videoUrl]);
 
@@ -70,6 +80,7 @@ function App() {
   };
 
   const _onReady: YouTubeProps["onReady"] = (e) => {
+    setPlayer(e.target);
     e.target.pauseVideo();
     setVideoTitle(e.target.videoTitle);
   };
@@ -86,6 +97,7 @@ function App() {
             onPlay={(e) =>{
               setCurrentFixed(Math.ceil(e.target.getCurrentTime()));
               setCurrent(Math.ceil(e.target.getCurrentTime()));
+              clearInterval(videoInterval);
               setVideoInterval(setInterval(() => setCurrent(Math.ceil(e.target.getCurrentTime())), 1000));
             }
             }
@@ -102,6 +114,10 @@ function App() {
           "& > :not(style)": { mb: 1, mr: 1, maxWidth: 900 },
         }}
       >
+        <TextField label="Title" value={videoTitle} fullWidth />
+        <Button onClick={onPlay}>Play</Button>
+        <Button onClick={onStop}>Stop</Button>
+
         <TextField
           label="video url"
           fullWidth
@@ -130,10 +146,11 @@ function App() {
           // getAriaValueText={valuetext}
         />
         <br />
-        <TextField label="Title" value={videoTitle} fullWidth />
-        <TextField label="Current" value={current} />
+        
         <TextField label="Start" value={start} />
+        <TextField label="Current" value={current} />
         <TextField label="End" value={end} />
+        
       </Box>
       <CopyToClipboard
         text={window.location.href}
