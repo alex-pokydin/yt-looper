@@ -1,52 +1,59 @@
-import {useEffect, useState, useMemo, useCallback} from 'react';
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import _ from "lodash";
-import Box from '@mui/material/Box';
-import {TextField, Slider, Button} from '@mui/material';
-import {CopyToClipboard} from 'react-copy-to-clipboard';
-import YouTube, { YouTubeProps } from 'react-youtube';
-import './App.css';
+import Box from "@mui/material/Box";
+//import { Unstable_NumberInput as NumberInput } from '@mui/base/Unstable_NumberInput';
+import { TextField, Slider, Button } from "@mui/material";
+import { CopyToClipboard } from "react-copy-to-clipboard";
+import YouTube, { YouTubeProps } from "react-youtube";
+import "./App.css";
 
 function App() {
-
   const [searchParams, setSearchParams] = useSearchParams();
   const [max, setMax] = useState(0);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoId, setVideoId] = useState(searchParams.get("id") || "");
-  const [value, setValue] = useState<number[]>([
-    parseInt(searchParams.get("start") || '') || 0, 
-    parseInt(searchParams.get("end") || '') || 0
-  ]);
+  const [start, setStart] = useState<number>(
+    parseInt(searchParams.get("start") || "") || 0
+  );
+  const [end, setEnd] = useState<number>(
+    parseInt(searchParams.get("end") || "") || 0
+  );
+  const [current, setCurrent] = useState<number>(0);
+  const [currentFixed, setCurrentFixed] = useState<number>(start);
+  const [videoTitle, setVideoTitle] = useState("");
+  const [videoInterval, setVideoInterval] = useState<any>(null);
 
   const [opts, setOpts] = useState({
     playerVars: {
       // https://developers.google.com/youtube/player_parameters
       autoplay: 1,
-      start: value[0],
-      end: value[1],
+      start: start,
+      end: end,
     },
   });
 
   useEffect(() => {
-    videoId && searchParams.set('id', videoId);
-    value[0] > 0 && searchParams.set('start', "" + value[0]);
-    value[1] > 0 && searchParams.set('end', "" + value[1]);
-    setSearchParams(searchParams, {replace: true});
-  }, [videoId, value]);
-  
-  
+    videoId && searchParams.set("id", videoId);
+    start > 0 && searchParams.set("start", "" + start);
+    end > 0 && searchParams.set("end", "" + end);
+    setSearchParams(searchParams, { replace: true });
+  }, [videoId, start, end]);
+
   const debounce = useCallback(
-    _.debounce((value: number[]) => {
+    _.debounce((start: number, end: number) => {
       setOpts({
         playerVars: {
           // https://developers.google.com/youtube/player_parameters
           autoplay: 1,
-          start: value[0],
-          end: value[1],
+          start: start,
+          end: end,
         },
       });
-  }, 500), []);
-  useEffect(() => debounce(value), [value]);
+    }, 1000),
+    []
+  );
+  useEffect(() => debounce(start, end), [start, end]);
 
   useEffect(() => {
     let videoCode = "";
@@ -57,18 +64,15 @@ function App() {
     }
   }, [videoUrl]);
 
-  const handleChange = (event: Event, newValue: number | number[]) => {
-    setValue(newValue as number[]);
-  };
-
   const checkElapsedTime = (e: any) => {
     const duration = e.target.getDuration();
     setMax(duration);
   };
 
-  const _onReady: YouTubeProps['onReady'] = (e) => {
+  const _onReady: YouTubeProps["onReady"] = (e) => {
     e.target.pauseVideo();
-  }
+    setVideoTitle(e.target.videoTitle);
+  };
 
   return (
     <div className="App">
@@ -77,8 +81,15 @@ function App() {
           <YouTube
             videoId={videoId}
             onStateChange={(e) => checkElapsedTime(e)}
-            opts={opts} 
+            opts={opts}
             onReady={_onReady}
+            onPlay={(e) =>{
+              setCurrentFixed(Math.ceil(e.target.getCurrentTime()));
+              setCurrent(Math.ceil(e.target.getCurrentTime()));
+              setVideoInterval(setInterval(() => setCurrent(Math.ceil(e.target.getCurrentTime())), 1000));
+            }
+            }
+            onPause={(e) => clearInterval(videoInterval)}
           />
         </div>
       </header>
@@ -88,30 +99,44 @@ function App() {
         autoComplete="off"
         sx={{
           p: 1,
-          '& > :not(style)': { mb: 1, mr: 1, maxWidth: 500 },
+          "& > :not(style)": { mb: 1, mr: 1, maxWidth: 900 },
         }}
       >
         <TextField
-          label="video url" 
+          label="video url"
           fullWidth
-          value={videoUrl} 
-          onChange={(e) => setVideoUrl(e.target.value)} 
+          value={videoUrl}
+          onChange={(e) => setVideoUrl(e.target.value)}
         />
-        <TextField fullWidth label="id" value={videoId}/>
+        <TextField fullWidth label="id" value={videoId} />
         <Slider
-          getAriaLabel={() => 'Temperature range'}
-          value={value}
-          onChange={handleChange}
+          getAriaLabel={() => "Temperature range"}
+          value={start}
+          onChange={(e: Event, val: number | number[]) =>
+            setStart(val as number)
+          }
           valueLabelDisplay="auto"
-          min={0} 
-          max={max}
+          min={Math.max(0, currentFixed - 30)}
+          max={Math.min(max, currentFixed + 30)}
           // getAriaValueText={valuetext}
         />
-        <br/>
-        <TextField label="Standard" value={value[0]}/>
-        <TextField label="Standard" value={value[1]}/>
+        <Slider
+          getAriaLabel={() => "Temperature range"}
+          value={end}
+          onChange={(e: Event, val: number | number[]) => setEnd(val as number)}
+          valueLabelDisplay="auto"
+          min={Math.max(0, currentFixed - 30)}
+          max={Math.min(max, currentFixed + 30)}
+          // getAriaValueText={valuetext}
+        />
+        <br />
+        <TextField label="Title" value={videoTitle} fullWidth />
+        <TextField label="Current" value={current} />
+        <TextField label="Start" value={start} />
+        <TextField label="End" value={end} />
       </Box>
-      <CopyToClipboard text={window.location.href}
+      <CopyToClipboard
+        text={window.location.href}
         // onCopy={() => this.setState({copied: true})}
       >
         <Button>Copy link to clipboard</Button>
